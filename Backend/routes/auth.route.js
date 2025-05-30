@@ -7,7 +7,7 @@ const router = express.Router()
 
 router.post("/signup", signup)
 router.post("/signin", signin)
-router.get("/signout", authenticateToken, signout)
+router.get("/signout", signout)
 router.get("/students", async (req, res) => {
     const students = await User.find({ role: "student" });
     res.json(students);
