@@ -3,13 +3,11 @@ import { errorHandler } from "../utilities.js";
 import bcryptjs from "bcryptjs";
 import jwt from "jsonwebtoken";
 
-// Allowed roles for signup validation
 const allowedRoles = ["student", "faculty"];
 
 export const signup = async (req, res, next) => {
-  const { username, email, password, role = "user" } = req.body;
+  const { username, email, password, role = "student" } = req.body;
 
-  // Basic validations
   if (!username) return next(errorHandler(400, "Username is required"));
   if (!email) return next(errorHandler(400, "Email is required"));
   if (!password) return next(errorHandler(400, "Password is required"));
@@ -24,7 +22,7 @@ export const signup = async (req, res, next) => {
     username,
     email,
     password: hashedPassword,
-    role, // <- include role here
+    role,
   });
 
   try {
@@ -34,8 +32,6 @@ export const signup = async (req, res, next) => {
       message: "User created successfully",
     });
   } catch (error) {
-    console.log(error);
-    
     next(error);
   }
 };
@@ -54,11 +50,17 @@ export const signin = async (req, res, next) => {
 
     const { password: pass, ...rest } = validUser._doc;
 
-   res.cookie("access_token", token, { httpOnly: true }).status(200).json({
-      success: true,
-      message: "Login successful!",
-      rest,
-    });
+    res
+      .cookie("access_token", token, {
+        httpOnly: true,
+        sameSite: "none",
+        secure: true,
+      })
+      .status(200)
+      .json({
+        success: true,
+        message: "Login successful!",
+      });
   } catch (error) {
     next(error);
   }
@@ -66,12 +68,31 @@ export const signin = async (req, res, next) => {
 
 export const signout = async (req, res, next) => {
   try {
-    res.clearCookie("access_token");
+    res.clearCookie("access_token", {
+      httpOnly: true,
+      sameSite: "none",
+      secure: true,
+    });
     res.status(200).json({
       success: true,
       message: "User logged out successfully",
     });
   } catch (error) {
     next(error);
+  }
+};
+
+export const getMe = async (req, res, next) => {
+  try {
+    const token = req.cookies.access_token;
+    if (!token) return res.status(401).json({ success: false, message: "Not authenticated" });
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const user = await User.findById(decoded.id).select("-password");
+    if (!user) return res.status(404).json({ success: false, message: "User not found" });
+
+    res.status(200).json({ success: true, user });
+  } catch (error) {
+    res.status(401).json({ success: false, message: "Invalid token" });
   }
 };

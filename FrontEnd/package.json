@@ -11,7 +11,8 @@
   },
   "dependencies": {
     "@alloc/quick-lru": "^5.2.0",
-    "@google/generative-ai": "^0.24.0",
+    "@google/genai": "^2.3.0",
+    "@google/generative-ai": "^0.24.1",
     "@headlessui/react": "^2.2.1",
     "@heroicons/react": "^2.2.0",
     "@react-three/drei": "^10.0.5",

@@ -1,49 +1,52 @@
-import express from "express"
-import { signin, signout, signup } from "../Controller/user.controller.js"
-import { authenticateToken } from "../utilities.js"
-import User from "../models/user.model.js"
+import express from "express";
+import { signin, signout, signup, getMe } from "../Controller/user.controller.js";
+import User from "../models/user.model.js";
 
-const router = express.Router()
+const router = express.Router();
 
-router.post("/signup", signup)
-router.post("/signin", signin)
-router.get("/signout", signout)
+router.post("/signup", signup);
+router.post("/signin", signin);
+router.get("/signout", signout);
+router.get("/me", getMe);
+
 router.get("/students", async (req, res) => {
-    const students = await User.find({ role: "student" });
-    res.json(students);
-  });
-  
+  const students = await User.find({ role: "student" });
+  res.json(students);
+});
+
 router.post("/student/:id/add", async (req, res) => {
-    try {
-      const { quizId, score,totalMarks } = req.body;
-      const studentId = req.params.id;
-  let scorePercentage = parseInt((score / totalMarks) * 100);
+  try {
+    const { quizId, score, totalMarks } = req.body;
+    const studentId = req.params.id;
+    let scorePercentage = parseInt((score / totalMarks) * 100);
+    const student = await User.findById(studentId);
+    if (!student) return res.status(404).json({ error: "Student not found" });
+
+    student.marks.push({ quizId, score: scorePercentage });
+    await student.save();
+
+    res.status(200).json({ message: "Marks added successfully" });
+  } catch (err) {
+    console.error("Error saving marks:", err);
+    res.status(500).json({ error: "Failed to add marks" });
+  }
+});
+
+router.put("/tests", async (req, res) => {
+  const { marks } = req.body;
+
+  await Promise.all(
+    Object.entries(marks).map(async ([studentId, mark]) => {
       const student = await User.findById(studentId);
-      if (!student) return res.status(404).json({ error: "Student not found" });
-  
-      student.marks.push({ quizId,score:scorePercentage });
+      student.marks.push(parseInt(mark));
       await student.save();
-  
-      res.status(200).json({ message: "Marks added successfully" });
-    } catch (err) {
-      console.error("❌ Error saving marks:", err);
-      res.status(500).json({ error: "Failed to add marks" });
-    }
-  });
-  router.put("/tests", async (req, res) => {
-    const { marks } = req.body;
-  
-    await Promise.all(
-      Object.entries(marks).map(async ([studentId, mark]) => {
-        const student = await User.findById(studentId);
-        student.marks.push(parseInt(mark));
-        await student.save();
-      })
-    );
-  
-    res.json({ message: "Marks updated" });
-  });
-  router.get("/tests/averages", async (req, res) => {
+    })
+  );
+
+  res.json({ message: "Marks updated" });
+});
+
+router.get("/tests/averages", async (req, res) => {
   const students = await User.find({ role: "student" });
 
   const numTests = Math.max(...students.map((s) => s.marks.length));
@@ -67,5 +70,4 @@ router.post("/student/:id/add", async (req, res) => {
   res.json(testAverages);
 });
 
-
-export default router
+export default router;

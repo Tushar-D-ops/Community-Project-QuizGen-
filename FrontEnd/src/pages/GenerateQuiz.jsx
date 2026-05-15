@@ -2,32 +2,26 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import Navbar from "../components/Navbar";
-import { chatSession } from "../utils/GeminiAIModel";
-import { useDispatch } from "react-redux";
-import { addNewQuiz } from "../redux/user/quizSlice";
+
+import  ai  from "../utils/GeminiAIModel";
 import axios from "axios";
-
-
+import { useAuth } from "../context/AuthContext";
 
 const difficulties = ["easy", "medium", "hard"];
 
 const GenerateQuiz = () => {
-  const dispatch = useDispatch();
-
   const [topic, setTopic] = useState("");
   const [description, setDescription] = useState("");
   const [classLevel, setClassLevel] = useState("");
   const [difficulty, setDifficulty] = useState("easy");
   const [loading, setLoading] = useState(false);
-  const [questions, setQuestions] = useState([]);
   const navigate = useNavigate();
-  const backend_url=import.meta.env.VITE_BACKEND_URL
-
+  const backend_url = import.meta.env.VITE_BACKEND_URL;
+  const { user } = useAuth();
 
   const generateQuiz = async () => {
     setLoading(true);
-    
-  
+
     try {
       const inputPrompt = `
       Topic: ${topic}
@@ -36,7 +30,6 @@ const GenerateQuiz = () => {
       Difficulty: ${difficulty}
     
       Based on the above information, generate 5 multiple-choice quiz questions.
-    
       Each question should be in JSON format with the following keys:
       - question
       - options with 0 indexed as ["A", "B", "C", "D"]
@@ -48,44 +41,37 @@ const GenerateQuiz = () => {
           "question": "What is ...?",
           "options": ["Option A", "Option B", "Option C", "Option D"],
           "correctAnswer": "Option B"
-        },
-        ...
+        }
       ]
     `;
-    
-  
-      const result = await chatSession.sendMessage(inputPrompt);
-      const mockResponse = await result.response.text();
-      const parsedQuestions = JSON.parse(mockResponse);
-  
-      setQuestions(parsedQuestions);
+
+      const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: inputPrompt,
+    });
+      const mockResponse = await response.text;
+      const cleanText = mockResponse
+  .replace(/```json/g, "")
+  .replace(/```/g, "")
+  .trim();
+
+const parsedQuestions = JSON.parse(cleanText);
+
       setLoading(false);
-  
-      // 🔥 Save to Redux
-      dispatch(addNewQuiz({
-        topic,
-        classLevel,
-        difficulty,
-        questions: parsedQuestions,
-        createdAt: new Date().toISOString(),
-      }));
-  
-      // 📦 Save to MongoDB via API
-      await axios.post(backend_url+"/api/quizzes", {
+
+      await axios.post(`${backend_url}/api/quizzes`, {
         topic,
         classLevel,
         difficulty,
         questions: parsedQuestions.map((q) => ({
           question: q.question,
           options: q.options,
-          correctAnswer: q.correctAnswer, // match DB model
+          correctAnswer: q.correctAnswer,
         })),
       });
-  
-      // ✅ Navigate to quiz page
+
       navigate("/quiz/student", { state: { questions: parsedQuestions, topic } });
-  
-      // Reset inputs
+
       setTopic("");
       setDescription("");
       setClassLevel("");
@@ -94,7 +80,6 @@ const GenerateQuiz = () => {
       setLoading(false);
     }
   };
-  
 
   return (
     <>
@@ -156,10 +141,9 @@ const GenerateQuiz = () => {
         <motion.button
           onClick={generateQuiz}
           disabled={loading}
-          className={`px-8 py-3 text-lg font-semibold text-white 
-                     bg-gradient-to-r from-cyan-400 to-blue-600 rounded-lg shadow-xl 
-                     transition-all duration-500 hover:scale-105 
-                     ${loading ? "opacity-50 cursor-not-allowed" : ""}`}
+          className={`px-8 py-3 text-lg font-semibold text-white bg-gradient-to-r from-cyan-400 to-blue-600 rounded-lg shadow-xl transition-all duration-500 hover:scale-105 ${
+            loading ? "opacity-50 cursor-not-allowed" : ""
+          }`}
         >
           {loading ? "Generating..." : "Generate Quiz 🚀"}
         </motion.button>
